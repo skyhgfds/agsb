@@ -45,6 +45,13 @@ delete_all() {
   # 删除proot目录下的所有文件，但保留root.sh和README.md
   find "$ROOTFS_DIR" -mindepth 1 -not -name "root.sh" -not -name "README.md" -not -name ".git" -not -path "*/.git/*" -exec rm -rf {} \; 2>/dev/null
   
+  # 从 .bashrc 中移除自动启动的配置
+  if [ -f ~/.bashrc ]; then
+    echo -e "${YELLOW}正在清理自动启动配置...${RESET_COLOR}"
+    # 使用sed命令删除标记块内的内容，并创建备份 .bashrc.bak
+    sed -i.bak '/# START PROOT-AUTORUN/,/# END PROOT-AUTORUN/d' ~/.bashrc
+  fi
+
   echo -e "${GREEN}所有配置和文件已删除!${RESET_COLOR}"
   echo -e "${WHITE}如果需要重新安装，请运行:${RESET_COLOR} ${GREEN}./root.sh${RESET_COLOR}"
   exit 0
@@ -91,10 +98,10 @@ fi
 # 根据用户输入决定是否安装Ubuntu
 case $install_ubuntu in
   [yY][eE][sS])
-    echo "开始下载Ubuntu基础系统..."
+    echo "开始下载Ubuntu 24.04 LTS 基础系统..."
     # 下载Ubuntu基础系统
     curl --retry $max_retries --connect-timeout $timeout -o /tmp/rootfs.tar.gz \
-      "http://cdimage.ubuntu.com/ubuntu-base/releases/20.04/release/ubuntu-base-20.04.4-base-${ARCH_ALT}.tar.gz"
+      "http://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.1-base-${ARCH_ALT}.tar.gz"
     
     echo "解压Ubuntu基础系统到 $ROOTFS_DIR..."
     # 解压到根文件系统目录
@@ -145,7 +152,7 @@ if [ ! -e $ROOTFS_DIR/.installed ]; then
   
   echo "清理临时文件..."
   # 清理临时文件
-  rm -rf /tmp/rootfs.tar.xz /tmp/sbin
+  rm -rf /tmp/rootfs.tar.gz /tmp/sbin
   
   echo "创建安装标记文件..."
   # 创建安装标记文件
@@ -185,14 +192,14 @@ cp /etc/apt/sources.list /etc/apt/sources.list.bak 2>/dev/null
 
 # 设置新的软件源
 tee /etc/apt/sources.list <<SOURCES
-deb http://archive.ubuntu.com/ubuntu jammy main universe restricted multiverse
-deb http://archive.ubuntu.com/ubuntu jammy-updates main universe restricted multiverse
-deb http://archive.ubuntu.com/ubuntu jammy-backports main universe restricted multiverse
-deb http://security.ubuntu.com/ubuntu jammy-security main universe restricted multiverse
+deb http://archive.ubuntu.com/ubuntu noble main universe restricted multiverse
+deb http://archive.ubuntu.com/ubuntu noble-updates main universe restricted multiverse
+deb http://archive.ubuntu.com/ubuntu noble-backports main universe restricted multiverse
+deb http://security.ubuntu.com/ubuntu noble-security main universe restricted multiverse
 SOURCES
 
 # 显示提示信息
-echo -e "\033[1;32m软件源已更新为Ubuntu 22.04 (Jammy)源\033[0m"
+echo -e "\033[1;32m软件源已更新为Ubuntu 24.04 (Noble)源\033[0m"
 echo -e "\033[1;33m正在更新系统并安装必要软件包，请稍候...\033[0m"
 
 # 更新系统并安装软件包
@@ -211,7 +218,7 @@ printf "\033[1;33m#                                                             
 printf "\033[1;33m################################################################################\033[0m\n"
 printf "\033[1;32m\n★ YouTube请点击关注!\033[0m\n"
 printf "\033[1;32m★ Github请点个Star支持!\033[0m\n\n"
-printf "\033[1;36m欢迎进入Ubuntu 20.04环境!\033[0m\n\n"
+printf "\033[1;36m欢迎进入Ubuntu 24.04 环境!\033[0m\n\n"
 printf "\033[1;33m提示: 输入 'exit' 可以退出proot环境\033[0m\n\n"
 EOF
 
@@ -234,6 +241,30 @@ EOF
 
 chmod +x $ROOTFS_DIR/start-proot.sh
 
+# --- 新增功能：配置自动启动 ---
+echo ""
+read -p "是否设置为SSH登录时自动启动proot环境? (y/n): " auto_start
+if [[ "$auto_start" == "y" || "$auto_start" == "Y" ]]; then
+  # 获取proot环境的绝对路径
+  ABS_ROOTFS_DIR=$(cd "$ROOTFS_DIR" && pwd)
+  
+  # 定义要添加到.bashrc的配置块
+  AUTO_START_BLOCK="
+# START PROOT-AUTORUN
+# Auto-start proot-ubuntu environment upon login
+if [ -z \"\$IN_PROOT_SESSION\" ] && [ -f \"$ABS_ROOTFS_DIR/start-proot.sh\" ]; then
+  export IN_PROOT_SESSION=1
+  exec $ABS_ROOTFS_DIR/start-proot.sh
+fi
+# END PROOT-AUTORUN
+"
+  # 追加到用户主目录下的.bashrc文件
+  echo "$AUTO_START_BLOCK" >> ~/.bashrc
+  echo -e "${GREEN}配置完成!${RESET_COLOR} ${WHITE}下次SSH登录时将自动进入proot环境。${RESET_COLOR}"
+  echo -e "${YELLOW}要撤销此操作, 请运行 ${WHITE}./root.sh del${YELLOW} 或手动编辑 ${WHITE}~/.bashrc${YELLOW} 文件并删除相关行。${RESET_COLOR}"
+fi
+# --- 新增功能结束 ---
+
 # 清屏并显示完成信息
 clear
 display_gg
@@ -250,11 +281,7 @@ read start_now
 if [[ "$start_now" == "y" || "$start_now" == "Y" ]]; then
   echo "正在启动proot环境..."
   # 启动proot环境并执行初始化脚本
-  cd $ROOTFS_DIR
-  $ROOTFS_DIR/usr/local/bin/proot \
-    --rootfs="${ROOTFS_DIR}" \
-    -0 -w "/root" -b /dev -b /sys -b /proc -b /etc/resolv.conf --kill-on-exit \
-    /bin/bash -c "cd /root && /bin/bash /root/init.sh && /bin/bash"
+  exec $ROOTFS_DIR/start-proot.sh
 else
   echo "您可以稍后使用 ./start-proot.sh 命令启动proot环境"
 fi
