@@ -183,20 +183,45 @@ echo -e "\033[1;32m已创建用户目录: /home/\$HOST_USER\033[0m"
 # 备份原始软件源
 cp /etc/apt/sources.list /etc/apt/sources.list.bak 2>/dev/null
 
+# 清理可能存在的新格式软件源文件，避免冲突
+rm -f /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null
+
 # 设置新的软件源 - Ubuntu 24.04 LTS (Noble Numbat)
 tee /etc/apt/sources.list <<SOURCES
+# Ubuntu 24.04 LTS (Noble Numbat) 官方软件源
 deb http://archive.ubuntu.com/ubuntu noble main universe restricted multiverse
 deb http://archive.ubuntu.com/ubuntu noble-updates main universe restricted multiverse
 deb http://archive.ubuntu.com/ubuntu noble-backports main universe restricted multiverse
 deb http://security.ubuntu.com/ubuntu noble-security main universe restricted multiverse
+
+# 源码包（可选）
+# deb-src http://archive.ubuntu.com/ubuntu noble main universe restricted multiverse
+# deb-src http://archive.ubuntu.com/ubuntu noble-updates main universe restricted multiverse
+# deb-src http://archive.ubuntu.com/ubuntu noble-backports main universe restricted multiverse
+# deb-src http://security.ubuntu.com/ubuntu noble-security main universe restricted multiverse
 SOURCES
 
 # 显示提示信息
 echo -e "\033[1;32m软件源已更新为Ubuntu 24.04 LTS (Noble Numbat)源\033[0m"
-echo -e "\033[1;33m正在更新系统并安装必要软件包，请稍候...\033[0m"
+echo -e "\033[1;33m正在清理APT缓存并更新系统，请稍候...\033[0m"
 
-# 更新系统并安装软件包
-apt -y update && apt -y upgrade && apt install -y curl wget git vim nano htop tmux python3 python3-pip python3-venv nodejs npm build-essential net-tools zip unzip sudo locales tree ca-certificates gnupg lsb-release iproute2 cron podman systemd-cron
+# 清理APT缓存，解决可能的软件源问题
+apt clean
+rm -rf /var/lib/apt/lists/*
+
+# 更新系统并安装软件包（分步执行以提高成功率）
+echo -e "\033[1;33m正在更新软件包列表...\033[0m"
+apt update
+
+echo -e "\033[1;33m正在升级系统软件包...\033[0m"
+apt -y upgrade
+
+echo -e "\033[1;33m正在安装必要软件包...\033[0m"
+apt install -y curl wget git vim nano htop tmux python3 python3-pip python3-venv nodejs npm build-essential net-tools zip unzip sudo locales tree ca-certificates gnupg lsb-release iproute2
+
+# 尝试安装可选软件包（如果失败也不影响主要功能）
+echo -e "\033[1;33m正在安装可选软件包...\033[0m"
+apt install -y podman 2>/dev/null || echo -e "\033[1;33m警告: podman安装失败，跳过此软件包\033[0m"
 
 echo -e "\033[1;32m系统更新和软件安装完成!\033[0m"
 
