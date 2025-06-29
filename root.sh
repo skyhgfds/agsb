@@ -82,7 +82,6 @@ if [ ! -e $ROOTFS_DIR/.installed ]; then
   echo "#"
   echo "#                           Copyright (C) 2024, RecodeStudios.Cloud"
   echo "#"
-  echo "#                           Updated for Ubuntu 24.04 LTS (Noble Numbat)"
   echo "#"
   echo "#######################################################################################"
 
@@ -92,26 +91,14 @@ fi
 # 根据用户输入决定是否安装Ubuntu
 case $install_ubuntu in
   [yY][eE][sS])
-    echo "开始下载Ubuntu 24.04 LTS基础系统..."
+    echo "开始下载Ubuntu 24.04基础系统..."
     # 下载Ubuntu 24.04基础系统
     curl --retry $max_retries --connect-timeout $timeout -o /tmp/rootfs.tar.gz \
-      "http://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.2-base-${ARCH_ALT}.tar.gz"
-    
-    # 检查下载是否成功
-    if [ ! -f /tmp/rootfs.tar.gz ] || [ ! -s /tmp/rootfs.tar.gz ]; then
-      echo -e "${RED}Ubuntu基础系统下载失败!${RESET_COLOR}"
-      exit 1
-    fi
+      "http://cdimage.ubuntu.com/ubuntu-base/releases/24.04.2/release/ubuntu-base-24.04.2-base-${ARCH_ALT}.tar.gz"
     
     echo "解压Ubuntu 24.04基础系统到 $ROOTFS_DIR..."
     # 解压到根文件系统目录
     tar -xf /tmp/rootfs.tar.gz -C $ROOTFS_DIR
-    
-    # 检查解压是否成功
-    if [ $? -ne 0 ]; then
-      echo -e "${RED}Ubuntu基础系统解压失败!${RESET_COLOR}"
-      exit 1
-    fi
     ;;
   *)
     echo "跳过Ubuntu安装。"
@@ -158,7 +145,7 @@ if [ ! -e $ROOTFS_DIR/.installed ]; then
   
   echo "清理临时文件..."
   # 清理临时文件
-  rm -rf /tmp/rootfs.tar.gz /tmp/sbin
+  rm -rf /tmp/rootfs.tar.xz /tmp/sbin
   
   echo "创建安装标记文件..."
   # 创建安装标记文件
@@ -178,7 +165,7 @@ if [ -f /etc/bash.bashrc ]; then
 fi
 
 # 显示提示信息
-PS1='\[\033[1;32m\]proot-ubuntu24.04\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]\\$ '
+PS1='\[\033[1;32m\]proot-ubuntu\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]\\$ '
 EOF
 
 echo "创建初始化脚本..."
@@ -196,16 +183,12 @@ echo -e "\033[1;32m已创建用户目录: /home/\$HOST_USER\033[0m"
 # 备份原始软件源
 cp /etc/apt/sources.list /etc/apt/sources.list.bak 2>/dev/null
 
-# 设置Ubuntu 24.04 LTS (Noble Numbat)软件源
+# 设置新的软件源 - Ubuntu 24.04 LTS (Noble Numbat)
 tee /etc/apt/sources.list <<SOURCES
-# Ubuntu 24.04 LTS (Noble Numbat) 官方软件源
-deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
-
-# 建议的额外软件源
-deb http://archive.canonical.com/ubuntu noble partner
+deb http://archive.ubuntu.com/ubuntu noble main universe restricted multiverse
+deb http://archive.ubuntu.com/ubuntu noble-updates main universe restricted multiverse
+deb http://archive.ubuntu.com/ubuntu noble-backports main universe restricted multiverse
+deb http://security.ubuntu.com/ubuntu noble-security main universe restricted multiverse
 SOURCES
 
 # 显示提示信息
@@ -213,27 +196,7 @@ echo -e "\033[1;32m软件源已更新为Ubuntu 24.04 LTS (Noble Numbat)源\033[0
 echo -e "\033[1;33m正在更新系统并安装必要软件包，请稍候...\033[0m"
 
 # 更新系统并安装软件包
-apt -y update && apt -y upgrade && apt install -y \
-  curl wget git vim nano htop tmux \
-  python3 python3-pip python3-venv \
-  nodejs npm \
-  build-essential \
-  net-tools iproute2 iputils-ping \
-  zip unzip \
-  sudo \
-  locales \
-  tree \
-  ca-certificates \
-  gnupg \
-  lsb-release \
-  cron \
-  systemd \
-  software-properties-common \
-  apt-transport-https
-
-# 设置语言环境
-locale-gen en_US.UTF-8
-update-locale LANG=en_US.UTF-8
+apt -y update && apt -y upgrade && apt install -y curl wget git vim nano htop tmux python3 python3-pip python3-venv nodejs npm build-essential net-tools zip unzip sudo locales tree ca-certificates gnupg lsb-release iproute2 cron podman systemd-cron
 
 echo -e "\033[1;32m系统更新和软件安装完成!\033[0m"
 
@@ -248,10 +211,7 @@ printf "\033[1;33m#                                                             
 printf "\033[1;33m################################################################################\033[0m\n"
 printf "\033[1;32m\n★ YouTube请点击关注!\033[0m\n"
 printf "\033[1;32m★ Github请点个Star支持!\033[0m\n\n"
-printf "\033[1;36m欢迎进入Ubuntu 24.04 LTS (Noble Numbat)环境!\033[0m\n\n"
-printf "\033[1;33m系统版本: Ubuntu 24.04.2 LTS (Noble Numbat)\033[0m\n"
-printf "\033[1;33m内核版本: \$(uname -r)\033[0m\n"
-printf "\033[1;33m架构: \$(uname -m)\033[0m\n\n"
+printf "\033[1;36m欢迎进入Ubuntu 24.04 LTS环境!\033[0m\n\n"
 printf "\033[1;33m提示: 输入 'exit' 可以退出proot环境\033[0m\n\n"
 EOF
 
@@ -264,7 +224,7 @@ echo "创建启动脚本..."
 cat > $ROOTFS_DIR/start-proot.sh << EOF
 #!/bin/bash
 # 启动proot环境
-echo "正在启动Ubuntu 24.04 LTS proot环境..."
+echo "正在启动proot环境..."
 cd $ROOTFS_DIR
 $ROOTFS_DIR/usr/local/bin/proot \\
   --rootfs="$ROOTFS_DIR" \\
@@ -278,7 +238,6 @@ chmod +x $ROOTFS_DIR/start-proot.sh
 clear
 display_gg
 echo -e "\n${CYAN}Ubuntu 24.04 LTS proot环境已安装完成!${RESET_COLOR}"
-echo -e "${CYAN}版本: Ubuntu 24.04.2 LTS (Noble Numbat)${RESET_COLOR}"
 echo -e "${CYAN}使用以下命令启动proot环境:${RESET_COLOR}"
 echo -e "${WHITE}    ./start-proot.sh${RESET_COLOR}"
 echo -e "${CYAN}在proot环境中输入 'exit' 可以退出${RESET_COLOR}"
@@ -289,7 +248,7 @@ echo "是否立即启动proot环境? (y/n): "
 read start_now
 
 if [[ "$start_now" == "y" || "$start_now" == "Y" ]]; then
-  echo "正在启动Ubuntu 24.04 LTS proot环境..."
+  echo "正在启动proot环境..."
   # 启动proot环境并执行初始化脚本
   cd $ROOTFS_DIR
   $ROOTFS_DIR/usr/local/bin/proot \
